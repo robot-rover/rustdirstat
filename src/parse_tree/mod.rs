@@ -95,6 +95,7 @@ impl File {
 enum Elem {
     File(File),
     Dir(Dir),
+    Other,
 }
 
 pub fn print_tree(root: &Dir, indent: u32) {
