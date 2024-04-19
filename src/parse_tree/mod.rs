@@ -1,14 +1,38 @@
+use std::{
+    ffi::{OsStr, OsString},
+    fmt, io,
+    path::PathBuf,
+};
 
-use std::{ffi::{OsStr, OsString}, fs, io};
+mod recurse;
+// mod serial;
 
-mod serial;
-mod accum_tree;
-
-pub use serial::parse_tree as parse_tree;
+pub use recurse::parse_tree;
 
 pub struct CacheOsStr {
     os_str: Option<OsString>,
     string: String,
+}
+
+pub struct FileError {
+    pub file: PathBuf,
+    pub error: io::Error,
+}
+
+impl fmt::Display for FileError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}: {}", self.file.display(), self.error)
+    }
+}
+
+trait LabelError {
+    fn label(self, file: PathBuf) -> FileError;
+}
+
+impl LabelError for io::Error {
+    fn label(self, file: PathBuf) -> FileError {
+        FileError { file, error: self }
+    }
 }
 
 impl From<OsString> for CacheOsStr {
@@ -24,7 +48,7 @@ impl From<OsString> for CacheOsStr {
                     os_str: Some(os_string),
                     string,
                 }
-            },
+            }
         }
     }
 }
@@ -47,23 +71,16 @@ impl AsRef<str> for CacheOsStr {
 
 pub struct Dir {
     name: CacheOsStr,
-    unparsed_children: Vec<OsString>,
     files: Vec<File>,
     dirs: Vec<Dir>,
-    errors: Vec<io::Error>,
 }
 
 impl Dir {
-    fn new(name: OsString, contents: fs::ReadDir) -> Self {
-        let mut err_list = Vec::new();
-        let unparsed_children = contents.filter_map(|res| res.map_err(|err| err_list.push(err)).ok()).map(|entry| entry.file_name()).collect();
-
+    fn new(name: OsString) -> Self {
         Dir {
             name: name.into(),
-            unparsed_children,
             files: Vec::new(),
             dirs: Vec::new(),
-            errors: err_list,
         }
     }
 
@@ -80,7 +97,10 @@ pub struct File {
 
 impl File {
     fn new(name: OsString, size: u64) -> Self {
-        File { name: name.into(), size }
+        File {
+            name: name.into(),
+            size,
+        }
     }
 
     fn get_name(&self) -> &str {

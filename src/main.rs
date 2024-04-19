@@ -2,7 +2,7 @@ use std::io;
 
 mod parse_tree;
 
-use parse_tree::{parse_tree, print_tree};
+use parse_tree::parse_tree;
 
 fn main() -> io::Result<()> {
     let (tree, errors) = parse_tree("/home/")?;
