@@ -5,7 +5,7 @@ mod parse_tree;
 use parse_tree::parse_tree;
 
 fn main() -> io::Result<()> {
-    let (tree, errors) = parse_tree("/home/")?;
+    let (tree, errors) = parse_tree("/")?;
     for error in errors {
         eprintln!("{}", error);
     }

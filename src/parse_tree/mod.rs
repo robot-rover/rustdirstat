@@ -5,15 +5,24 @@ use std::{
 };
 
 mod recurse;
-// mod serial;
+mod serial;
+mod parallel;
+mod parallel2;
 
-pub use recurse::parse_tree;
+pub use parallel2::parse_tree;
 
 pub struct CacheOsStr {
     os_str: Option<OsString>,
     string: String,
 }
 
+impl fmt::Debug for CacheOsStr {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        AsRef::<str>::as_ref(self).fmt(f)
+    }
+}
+
+#[derive(Debug)]
 pub struct FileError {
     pub file: PathBuf,
     pub error: io::Error,
@@ -69,10 +78,12 @@ impl AsRef<str> for CacheOsStr {
     }
 }
 
+#[derive(Debug)]
 pub struct Dir {
     name: CacheOsStr,
     files: Vec<File>,
     dirs: Vec<Dir>,
+    errors: Vec<FileError>,
 }
 
 impl Dir {
@@ -81,6 +92,7 @@ impl Dir {
             name: name.into(),
             files: Vec::new(),
             dirs: Vec::new(),
+            errors: Vec::new(),
         }
     }
 
@@ -90,6 +102,7 @@ impl Dir {
 }
 
 // TODO: Open and close fd
+#[derive(Debug)]
 pub struct File {
     name: CacheOsStr,
     size: u64,
@@ -112,6 +125,7 @@ impl File {
     }
 }
 
+#[derive(Debug)]
 enum Elem {
     File(File),
     Dir(Dir),
