@@ -4,12 +4,9 @@ use std::{
     path::PathBuf,
 };
 
-mod recurse;
-mod serial;
-mod parallel;
-mod parallel2;
-
-pub use parallel2::parse_tree;
+pub mod serial;
+pub mod parallel;
+pub mod parallel2;
 
 pub struct CacheOsStr {
     os_str: Option<OsString>,
