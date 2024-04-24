@@ -1,12 +1,26 @@
 use std::{
     ffi::{OsStr, OsString},
     fmt, io,
-    path::PathBuf,
+    path::{Path, PathBuf},
 };
 
-pub mod serial;
 pub mod parallel;
-pub mod parallel2;
+pub mod serial;
+
+#[derive(Debug)]
+pub struct Sizes {
+    pub files_size: u64,
+    pub total_size: u64,
+}
+
+impl Default for Sizes {
+    fn default() -> Self {
+        Sizes {
+            files_size: 0,
+            total_size: 0,
+        }
+    }
+}
 
 pub struct CacheOsStr {
     os_str: Option<OsString>,
@@ -31,12 +45,20 @@ impl fmt::Display for FileError {
     }
 }
 
+type FileResult<T> = Result<T, FileError>;
+
 trait LabelError {
-    fn label(self, file: PathBuf) -> FileError;
+    fn take_label(self, file: PathBuf) -> FileError;
+    fn label<P: AsRef<Path>>(self, file: P) -> FileError
+    where
+        Self: Sized,
+    {
+        self.take_label(file.as_ref().to_owned())
+    }
 }
 
 impl LabelError for io::Error {
-    fn label(self, file: PathBuf) -> FileError {
+    fn take_label(self, file: PathBuf) -> FileError {
         FileError { file, error: self }
     }
 }
@@ -80,7 +102,7 @@ pub struct Dir {
     name: CacheOsStr,
     files: Vec<File>,
     dirs: Vec<Dir>,
-    errors: Vec<FileError>,
+    size: Sizes,
 }
 
 impl Dir {
@@ -89,12 +111,24 @@ impl Dir {
             name: name.into(),
             files: Vec::new(),
             dirs: Vec::new(),
-            errors: Vec::new(),
+            size: Sizes::default(),
         }
     }
 
-    fn get_name(&self) -> &str {
+    pub fn get_name(&self) -> &str {
         self.name.as_ref()
+    }
+
+    pub fn get_dirs(&self) -> &Vec<Dir> {
+        &self.dirs
+    }
+
+    pub fn get_files(&self) -> &Vec<File> {
+        &self.files
+    }
+
+    pub fn get_size(&self) -> &Sizes {
+        &self.size
     }
 }
 
