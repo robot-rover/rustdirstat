@@ -1,11 +1,30 @@
 use std::{
-    ffi::{OsStr, OsString},
-    fmt, io,
-    path::{Path, PathBuf},
+    ffi::{OsStr, OsString}, fmt, fs, io, os::unix::fs::MetadataExt, path::{Path, PathBuf}
 };
 
+mod fs_crossing;
 pub mod parallel;
 pub mod serial;
+
+pub struct Config {
+    pub follow_symlinks: bool,
+    pub same_filesystem: bool,
+}
+
+impl Config {
+    pub fn new(follow_symlinks: bool, same_filesystem: bool) -> Self {
+        Config {
+            follow_symlinks,
+            same_filesystem,
+        }
+    }
+}
+
+struct WalkContext {
+    config: Config,
+    root_fs: u64,
+}
+
 
 #[derive(Debug)]
 pub struct Sizes {
@@ -44,8 +63,6 @@ impl fmt::Display for FileError {
         write!(f, "{}: {}", self.file.display(), self.error)
     }
 }
-
-type FileResult<T> = Result<T, FileError>;
 
 trait LabelError {
     fn take_label(self, file: PathBuf) -> FileError;
@@ -160,7 +177,6 @@ impl File {
 enum Elem {
     File(File),
     Dir(Dir),
-    Other,
 }
 
 pub fn print_tree(root: &Dir, indent: u32) {
@@ -172,4 +188,40 @@ pub fn print_tree(root: &Dir, indent: u32) {
     for dir in root.dirs.iter() {
         print_tree(dir, indent + 1);
     }
+}
+
+fn read_dir_entry<F: FnMut(FileError)>(path: &Path, context: &WalkContext, mut err_collect: F) -> Vec<Elem> {
+    let read_dir = match fs::read_dir(path) {
+        Ok(rd) => rd,
+        Err(err) => {
+            err_collect(err.label(path));
+            return Vec::new();
+        }
+    };
+    read_dir
+        .map(|res| {
+            res.map_err(|err| err.label(path)).and_then(|entry| {
+                let meta = entry.metadata().map_err(|err| err.label(path))?;
+                if context.config.same_filesystem {
+                    if meta.dev() != context.root_fs {
+                        return Ok(None);
+                    }
+                }
+                let mut file_type = meta.file_type();
+                if file_type.is_symlink() && context.config.follow_symlinks {
+                    file_type = fs::metadata(entry.path()).map_err(|err| err.label(path))?.file_type();
+                }
+
+                let elem = if file_type.is_dir() {
+                    Some(Elem::Dir(Dir::new(entry.file_name())))
+                } else if file_type.is_file() || file_type.is_symlink() {
+                    Some(Elem::File(File::new(entry.file_name(), meta.len())))
+                } else {
+                    None
+                };
+                Ok(elem)
+            })
+        })
+        .filter_map(|res| res.map_err(&mut err_collect).ok().flatten())
+        .collect()
 }
