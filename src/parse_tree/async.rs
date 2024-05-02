@@ -1,26 +1,17 @@
-use std::{collections::LinkedList, ffi::OsStr, io, path::Path};
+use std::{
+    collections::LinkedList,
+    ffi::OsStr, io,
+    path::Path,
+};
 
-use rayon::iter::{IntoParallelRefMutIterator, ParallelIterator};
+use super::{fs_crossing, read_dir_entry, Config, Dir, Elem, FileError, WalkContext};
 
-use super::{fs_crossing, read_dir_entry, Config, Dir, Elem, FileError, LabelError, WalkContext};
-
-pub fn parse_tree<P: AsRef<Path>>(
-    path: P,
-    config: Config,
-) -> Result<(Dir, Vec<FileError>), FileError> {
-    let root_can = path
-        .as_ref()
-        .to_owned()
-        .canonicalize()
-        .map_err(|err| err.label(path.as_ref()))?;
+pub async fn parse_tree<P: AsRef<Path>>(path: P, config: Config) -> io::Result<(Dir, Vec<FileError>)> {
+    let root_can = path.as_ref().to_owned().canonicalize()?;
     let name = root_can.as_os_str().to_owned();
 
     let context = WalkContext {
-        root_fs: if config.same_filesystem {
-            fs_crossing::device_num(&root_can).map_err(|err| err.label(path.as_ref()))?
-        } else {
-            0
-        },
+        root_fs: if config.same_filesystem { fs_crossing::device_num(&root_can)? } else { 0 },
         config,
     };
 
@@ -29,7 +20,7 @@ pub fn parse_tree<P: AsRef<Path>>(
     Ok((dir, errors.into_iter().collect()))
 }
 
-fn recurse_dir(dir: &mut Dir, path: &Path, context: &WalkContext) -> LinkedList<FileError> {
+async fn recurse_dir(dir: &mut Dir, path: &Path, context: &WalkContext) -> LinkedList<FileError> {
     let mut errors = LinkedList::new();
     let children = read_dir_entry(&path, context, |err| errors.push_back(err));
     for child in children {
@@ -38,10 +29,11 @@ fn recurse_dir(dir: &mut Dir, path: &Path, context: &WalkContext) -> LinkedList<
             Elem::File(f) => {
                 dir.size.files_size += f.size;
                 dir.files.push(f);
-            }
+            },
         }
     }
-    let mut child_errors = dir
+
+    let mut child_ = dir
         .dirs
         .par_iter_mut()
         .map(|d| recurse_dir(d, &path.to_owned().join::<&OsStr>(d.name.as_ref()), context))
@@ -53,8 +45,7 @@ fn recurse_dir(dir: &mut Dir, path: &Path, context: &WalkContext) -> LinkedList<
             },
         );
 
-    dir.size.total_size =
-        dir.size.files_size + dir.dirs.iter().map(|d| d.size.total_size).sum::<u64>();
+    dir.size.total_size = dir.size.files_size + dir.dirs.iter().map(|d| d.size.total_size).sum::<u64>();
     if errors.len() > 0 {
         child_errors.append(&mut errors);
     }

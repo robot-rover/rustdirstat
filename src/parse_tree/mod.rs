@@ -1,5 +1,8 @@
 use std::{
-    ffi::{OsStr, OsString}, fmt, fs, io, os::unix::fs::MetadataExt, path::{Path, PathBuf}
+    ffi::{OsStr, OsString},
+    fmt, fs, io,
+    os::unix::fs::MetadataExt,
+    path::{Path, PathBuf},
 };
 
 mod fs_crossing;
@@ -24,7 +27,6 @@ struct WalkContext {
     config: Config,
     root_fs: u64,
 }
-
 
 #[derive(Debug)]
 pub struct Sizes {
@@ -52,10 +54,10 @@ impl fmt::Debug for CacheOsStr {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct FileError {
     pub file: PathBuf,
-    pub error: io::Error,
+    pub error: String,
 }
 
 impl fmt::Display for FileError {
@@ -76,7 +78,10 @@ trait LabelError {
 
 impl LabelError for io::Error {
     fn take_label(self, file: PathBuf) -> FileError {
-        FileError { file, error: self }
+        FileError {
+            file,
+            error: self.to_string(),
+        }
     }
 }
 
@@ -114,12 +119,28 @@ impl AsRef<str> for CacheOsStr {
     }
 }
 
-#[derive(Debug)]
 pub struct Dir {
     name: CacheOsStr,
     files: Vec<File>,
     dirs: Vec<Dir>,
     size: Sizes,
+}
+
+impl Clone for Dir {
+    fn clone(&self) -> Self {
+        panic!("Don't Clone Me!")
+    }
+}
+
+impl fmt::Debug for Dir {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.debug_struct("Dir")
+            .field("name", &self.get_name())
+            .field("files", &format!("Vec<File>({})", self.files.len()))
+            .field("dirs", &format!("Vec<Dir>({})", self.dirs.len()))
+            .field("size", &self.size)
+            .finish()
+    }
 }
 
 impl Dir {
@@ -190,7 +211,11 @@ pub fn print_tree(root: &Dir, indent: u32) {
     }
 }
 
-fn read_dir_entry<F: FnMut(FileError)>(path: &Path, context: &WalkContext, mut err_collect: F) -> Vec<Elem> {
+fn read_dir_entry<F: FnMut(FileError)>(
+    path: &Path,
+    context: &WalkContext,
+    mut err_collect: F,
+) -> Vec<Elem> {
     let read_dir = match fs::read_dir(path) {
         Ok(rd) => rd,
         Err(err) => {
@@ -209,7 +234,9 @@ fn read_dir_entry<F: FnMut(FileError)>(path: &Path, context: &WalkContext, mut e
                 }
                 let mut file_type = meta.file_type();
                 if file_type.is_symlink() && context.config.follow_symlinks {
-                    file_type = fs::metadata(entry.path()).map_err(|err| err.label(path))?.file_type();
+                    file_type = fs::metadata(entry.path())
+                        .map_err(|err| err.label(path))?
+                        .file_type();
                 }
 
                 let elem = if file_type.is_dir() {

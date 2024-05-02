@@ -9,7 +9,11 @@ pub fn parse_tree<P: AsRef<Path>>(root: P, config: Config) -> io::Result<(Dir, V
     let name = path.as_os_str().to_owned();
 
     let context = WalkContext {
-        root_fs: if config.same_filesystem { fs_crossing::device_num(&path)? } else { 0 },
+        root_fs: if config.same_filesystem {
+            fs_crossing::device_num(&path)?
+        } else {
+            0
+        },
         config,
     };
 
