@@ -73,7 +73,7 @@ where
 
     fn state(&self) -> tree::State {
         tree::State::new(TreeViewState::<Renderer::Paragraph> {
-            col_widths: vec![30.0; T::N_COLS],
+            col_widths: vec![200.0; T::N_COLS],
             top_offset: 0.0,
             row_text: Vec::new(),
             row_para: Vec::new(),
@@ -95,7 +95,7 @@ where
     ) -> iced::advanced::layout::Node {
         println!("Layout");
         let size = renderer.default_size();
-        // let line_height = LineHeight::default().to_absolute(size);
+        let line_height = LineHeight::default();
         let state = tree
             .state
             .downcast_mut::<TreeViewState<Renderer::Paragraph>>();
@@ -107,9 +107,9 @@ where
                 let mut para = Renderer::Paragraph::default();
                 para.update(Text {
                     content: &col,
-                    bounds: Size::new(width, f32::INFINITY), // TODO
+                    bounds: Size::new(width, line_height.to_absolute(size).0),
                     size,
-                    line_height: LineHeight::default(),
+                    line_height,
                     font: renderer.default_font(),
                     horizontal_alignment: alignment::Horizontal::Left,
                     vertical_alignment: alignment::Vertical::Top,
@@ -119,10 +119,11 @@ where
             }).collect()
         }).collect();
 
-        let width = Length::Shrink;
-        let height = Length::Shrink;
+        let width = Length::Fill;
+        let height = Length::Fill;
         layout::sized(limits, width, height, |limits| {
-            Size::new(400.0, 400.0)
+            println!("{:?}", limits);
+            limits.min()
         })
     }
 
@@ -141,7 +142,8 @@ where
             .state
             .downcast_ref::<TreeViewState<Renderer::Paragraph>>();
         let line_height = 20.0; // TODO
-        let bounds = layout.bounds();
+        let bounds = layout.bounds(); // TODO: also clip the viewport?
+        // println!("bounds: {:?}, viewport: {:?}", bounds, viewport);
         for (idx, row) in state.row_para.iter().enumerate() {
             let y = state.top_offset + idx as f32 * line_height;
             let mut x = 0.0;
@@ -149,7 +151,7 @@ where
                 let top_left = Point::new(bounds.x + x, bounds.y + y);
                 let size = Size::new(width, line_height);
                 let clip = Rectangle::new(top_left, size).intersection(&layout.bounds());
-                println!("clip: {:?}\n  tl: {:?}\n  sz: {:?}\n  vp: {:?}\n  bn: {:?}", clip, top_left, size, viewport, layout.bounds());
+                // println!("clip: {:?}\n  tl: {:?}\n  sz: {:?}\n  vp: {:?}\n  bn: {:?}", clip, top_left, size, viewport, layout.bounds());
                 if let Some(clip_some) = clip {
                     renderer.fill_paragraph(&para, top_left, Color::BLACK, clip_some);
                 }

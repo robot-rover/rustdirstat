@@ -1,9 +1,7 @@
 use std::{borrow::Cow, io, path::PathBuf, rc::Rc, sync::Arc};
 
 use iced::{
-    executor,
-    widget::{column, container, scrollable, slider, text, vertical_slider, Button, Text},
-    Application, Command, Theme,
+    color, executor, widget::{column, container, scrollable, slider, text, vertical_slider, Button, Text}, Application, Command, Theme
 };
 use iced::{Element, Length, Sandbox, Settings};
 
@@ -111,11 +109,12 @@ impl Application for RustDirStat {
             //     .iter()
             //     .map(|d| Text::new(d.get_name()).into());
             // let scroll = scrollable(column(list))
-            //     .width(Length::Fill)
-            //     .height(Length::Fill);
+                // .width(Length::Fill)
+                // .height(Length::Fill);
             column![
                 container(display).center_x(),
                 container(TreeView::new(dir)).center_x(),
+                // container(scroll).center_x(),
                 container(open_picker).center_x(),
             ]
         } else {
@@ -124,12 +123,13 @@ impl Application for RustDirStat {
                 container(open_picker).center_x(),
             ]
         };
-        container(content.spacing(25))
+        let el: Element<_> = container(content.spacing(25))
             .height(Length::Fill)
             .width(Length::Fill)
             .center_x()
             .center_y()
-            .into()
+            .into();
+        el.explain(color!(0x0000FF))
     }
 }
 
