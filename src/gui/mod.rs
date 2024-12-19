@@ -104,17 +104,9 @@ impl Application for RustDirStat {
         let display = Text::new(status_message);
         let open_picker = Button::new("Open Folder").on_press(Message::PickDir);
         let content = if let Page::Displaying(dir, errors) = &self.page {
-            // let list = dir
-            //     .get_dirs()
-            //     .iter()
-            //     .map(|d| Text::new(d.get_name()).into());
-            // let scroll = scrollable(column(list))
-                // .width(Length::Fill)
-                // .height(Length::Fill);
             column![
                 container(display).center_x(),
                 container(TreeView::new(dir)).center_x(),
-                // container(scroll).center_x(),
                 container(open_picker).center_x(),
             ]
         } else {
@@ -123,13 +115,13 @@ impl Application for RustDirStat {
                 container(open_picker).center_x(),
             ]
         };
-        let el: Element<_> = container(content.spacing(25))
+        let el: Element<_> = container(content.spacing(25).padding(25))
             .height(Length::Fill)
             .width(Length::Fill)
             .center_x()
             .center_y()
             .into();
-        el.explain(color!(0x0000FF))
+        el//.explain(color!(0x0000FF))
     }
 }
 
